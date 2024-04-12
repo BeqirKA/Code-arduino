@@ -1,0 +1,129 @@
+#include <SoftwareSerial.h> // SoftwareSerial for serial communication with HM10 bluetooth module.
+#include <ArduinoBlue.h> // ArduinoBlue bluetooth library
+#include <Servo_Hardware_PWM.h>
+#include <Stepper.h>
+// Définition des broches de commande pour le L298N
+const int in1 = 23;
+const int in2 = 22;
+const int in3 = 32;
+const int in4 = 38;
+const int ena = 6;
+const int enb = 11;
+const int BLUETOOTH_TX = 53;
+const int BLUETOOTH_RX = 52;
+const unsigned long BAUD_RATE = 9600;
+const int stepsPerRevolution = 2048;
+Servo monServo;
+Servo Servo2;
+Stepper myStepper = Stepper(stepsPerRevolution, 48, 44, 46, 42);
+SoftwareSerial softSerial(BLUETOOTH_TX, BLUETOOTH_RX); // Object for serial communication to HM 10 bluetooth module using ditigal pins.
+ArduinoBlue phone(softSerial); // Object for smartphone robot control.
+
+void setPins() {
+  // Définir les broches de commande en sortie
+  pinMode(in1, OUTPUT);
+  pinMode(in2, OUTPUT);
+  pinMode(in3, OUTPUT);
+  pinMode(in4, OUTPUT);
+  pinMode(ena, OUTPUT);
+  pinMode(enb, OUTPUT);
+}
+
+void setup() {
+	delay(500);
+        // Start serial communications.
+        // The baud rate must be the same for both serials.
+	// Start communication with HM10 bluetooth module.
+	softSerial.begin(BAUD_RATE);
+
+	// Begin serial communication with computer.
+	Serial.begin(BAUD_RATE);
+
+	// Set pin modes
+	setPins();
+
+  monServo.attach(2);
+  Servo2.attach(3);
+
+  myStepper.setSpeed(10);
+
+	Serial.println("SETUP COMPLETE");
+}
+
+void loop() {
+  int puissance = phone.getThrottle();
+  int tourner = phone.getSteering();
+  int sliderId = phone.getSliderId();
+  int sliderVal = phone.getSliderVal();
+  int bouton = phone.getButton();
+  String str = phone.getText();
+
+  if (puissance == 99) {
+    digitalWrite(in1, LOW);
+    digitalWrite(in2, HIGH);
+    digitalWrite(in3, LOW);
+    digitalWrite(in4, HIGH);
+    analogWrite(ena, 255);
+    analogWrite(enb, 255);
+  }
+  if (puissance == 49 && tourner == 49) {
+    digitalWrite(in1, LOW);
+    digitalWrite(in2, LOW);
+    digitalWrite(in3, LOW);
+    digitalWrite(in4, LOW);
+    analogWrite(ena, 255);
+    analogWrite(enb, 255);
+  }
+  if (puissance == 0) {
+    digitalWrite(in1, HIGH);
+    digitalWrite(in2, LOW);
+    digitalWrite(in3, HIGH);
+    digitalWrite(in4, LOW);
+    analogWrite(ena, 255);
+    analogWrite(enb, 255);
+  }
+  if (tourner == 99) {
+    digitalWrite(in1, LOW);
+    digitalWrite(in2, HIGH);
+    digitalWrite(in3, HIGH);
+    digitalWrite(in4, LOW);
+    analogWrite(ena, 255);
+    analogWrite(enb, 255);
+  }
+  if (tourner == 0) {
+    digitalWrite(in1, HIGH);
+    digitalWrite(in2, LOW);
+    digitalWrite(in3, LOW);
+    digitalWrite(in4, HIGH);
+    analogWrite(ena, 255);
+    analogWrite(enb, 255);
+  }
+  if (sliderId == 2) {
+    int angle = map(sliderVal, 0, 100, 0, 90);
+    monServo.write(angle);
+    delay(15);
+  }
+  if (sliderId == 3) {
+    if (sliderVal < 50) {
+      int angle = map(sliderVal, 0, 49, 0, 89);
+      Servo2.write(angle);
+      delay(15);
+    }
+    else if (sliderVal > 50) {
+      int angle = map(sliderVal, 51, 100, 90, 180);
+      Servo2.write(angle);
+      delay(15);
+    }
+    else {
+      Servo2.write(90);
+      delay(15);
+    }
+  }
+  if (str != "") {
+    int valeur = str.toInt();
+    Serial.println(valeur);
+    int angle = 360/valeur;
+    myStepper.step(stepsPerRevolution/angle);
+    delay(50);
+  }
+}
